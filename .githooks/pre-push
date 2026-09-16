@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# main/master 직접 push와 강제(non-fast-forward) push를 차단한다.
+protected_branches='^(main|master)$'
+z40=0000000000000000000000000000000000000000
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  branch=$(echo "$remote_ref" | sed 's#refs/heads/##')
+
+  if echo "$branch" | grep -qE "$protected_branches"; then
+    echo "'$branch' 브랜치로의 직접 push는 금지되어 있습니다. feature 브랜치를 만들어 PR로 병합하세요." >&2
+    exit 1
+  fi
+
+  # local_sha가 z40이면 브랜치 삭제(delete) push이므로 강제 push 검사 대상이 아님
+  if [ "$remote_sha" != "$z40" ] && [ "$local_sha" != "$z40" ]; then
+    if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+      echo "'$branch'에 대한 강제 push(non-fast-forward)가 감지되었습니다. 강제 push는 금지되어 있습니다." >&2
+      exit 1
+    fi
+  fi
+done
+
+exit 0

@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"오늘 날짜: $(date +%Y-%m-%d) / 현재 브랜치: $(git branch --show-current)\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); command=$(echo \"$input\" | jq -r '.tool_input.command // empty'); if echo \"$command\" | grep -qE 'rm -rf /|git push.*--force|git reset --hard'; then echo '위험한 명령어가 감지되어 차단되었습니다.' >&2; exit 2; fi; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); file_path=$(echo \"$input\" | jq -r '.tool_input.file_path // empty'); if [[ \"$file_path\" == *.java ]]; then cd \"$CLAUDE_PROJECT_DIR\" && ./gradlew spotlessApply -q || true; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && ./gradlew test -q || echo '테스트 실패 (ArchUnit 아키텍처 규칙 포함) - 확인이 필요합니다' >&2"
+          },
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && ./scripts/check-uncommitted.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

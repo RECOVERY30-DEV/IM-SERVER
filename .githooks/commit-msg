@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# 커밋 메시지가 CLAUDE.md 컨벤션([타입] 설명)을 따르는지 검사한다.
+commit_msg_file="$1"
+commit_msg=$(head -n1 "$commit_msg_file")
+
+# Merge/Revert 커밋은 형식 검사 제외
+if echo "$commit_msg" | grep -qE '^(Merge |Revert )'; then
+  exit 0
+fi
+
+pattern='^\[(feat|fix|refactor|domain|arch|docs|test|chore)\] .+'
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+  echo "커밋 메시지 형식이 올바르지 않습니다." >&2
+  echo "형식: [타입] 설명   예) [feat] 주문 생성 슬라이스 추가" >&2
+  echo "허용 타입: feat, fix, refactor, domain, arch, docs, test, chore" >&2
+  echo "입력한 메시지: $commit_msg" >&2
+  exit 1
+fi
+
+exit 0
