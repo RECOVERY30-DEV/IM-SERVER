@@ -75,8 +75,9 @@ src/main/java/com/im/server
 - Command/Response/View record의 각 필드에 `@Schema(description = "...", example = "...")` 추가
 
 ### DB / 마이그레이션
+- 스키마는 [`docs/db-design.md`](./docs/db-design.md)가 정본이다 — 새 테이블을 설계하기 전에 먼저 확인할 것 (테이블 접두사 = 모듈, 3장에 컬럼별 근거)
 - 스키마는 Flyway가 관리한다 (`spring.jpa.hibernate.ddl-auto=validate`) — 엔티티만 고치고 마이그레이션을 안 만들면 애플리케이션이 기동 실패한다
-- 새 테이블/컬럼이 필요하면 `src/main/resources/db/migration/V{n}__{설명}.sql` 추가 (다음 버전 번호는 기존 파일 중 가장 큰 `V{n}` + 1)
+- 새 테이블/컬럼이 필요하면 `src/main/resources/db/migration/V{n}__{설명}.sql` 추가 (다음 버전 번호는 기존 파일 중 가장 큰 `V{n}` + 1, 현재 `V4`까지 존재 — condition/comparison/decision·proof/audit·consultation 테이블, 엔티티는 아직 없음)
 - 로컬 개발 DB는 `docker compose up -d` (MySQL, `.env` 없으면 root/root/im/3306 기본값 사용)
 - 클라우드 DB에 직접 붙어야 할 때만 `application-local.yml`을 만들어 쓴다 (gitignore 대상, `SPRING_PROFILES_ACTIVE=local`로 활성화)
 
