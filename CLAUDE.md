@@ -3,6 +3,7 @@
 ## 프로젝트 개요
 - 서비스명: **iM 조건체크** — 사전 안내 대출조건(V1)과 최종 약정조건(V2)을 전자서명 직전에 자동 대조하고, 달라진 조건·금전적 영향·원문 근거를 고객이 확인한 뒤 그 비교 기록의 무결성까지 검증할 수 있게 하는 서비스
 - 제품 배경/문제정의/요구사항/정책은 [`docs/prd.md`](./docs/prd.md) (PRD v1.0, 2026-09-12 기준)가 **정본**이다 — 새 기능을 설계하기 전에 반드시 먼저 읽을 것
+- 화면 매핑은 [`docs/wireframes.md`](./docs/wireframes.md), DB 스키마는 [`docs/db-design.md`](./docs/db-design.md), 리소스별 API 스펙(Command/Query/Response 필드, 에러코드)은 [`docs/api-design.md`](./docs/api-design.md)가 정본 — 슬라이스 구현 시 이 문서의 엔드포인트/필드명을 그대로 따를 것
 - 백엔드 서버 (Spring Boot, 모듈러 모놀리스 아키텍처)
 - 언어: Java 25
 - 빌드 도구: Gradle

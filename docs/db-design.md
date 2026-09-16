@@ -293,39 +293,17 @@ decision_required_reviews 전체 reviewed_at NOT NULL 확인
 
 ---
 
-## 5. 리소스별 API 매핑 (엔드포인트 = 리소스 1개, 화면이 조합)
+## 5. 리소스별 API 매핑
 
-### condition
-| 엔드포인트 | 리소스 | 사용 화면 |
+상세 스펙(요청/응답 필드, 에러코드, 화면 조합)은 [`docs/api-design.md`](./api-design.md)가 정본이다. 여기서는 리소스와 테이블의 대응만 요약한다.
+
+| 모듈 | 리소스 | 테이블 |
 | --- | --- | --- |
-| `POST /api/applications/{appId}/pre-conditions` (Idempotency-Key 헤더) | V1 Snapshot 생성 | S01 "이 조건으로 신청" |
-| `GET /api/applications/{appId}/pre-conditions/latest` | 현재 유효한 V1 | S01, E01 |
-| `POST /api/applications/{appId}/post-conditions` | V2 Snapshot 생성(내부/심사시스템 트리거) | 최종 심사 완료 이벤트 |
-
-### comparison
-| `POST /api/applications/{appId}/comparisons` | 비교 Job 시작 | V2 생성 직후 자동 트리거 |
-| `GET /api/comparisons/{runId}/progress` | 진행상태(폴링/SSE) | S02 |
-| `GET /api/comparisons/{runId}/summary` | Overall Status + Impact 요약 | S03 |
-| `GET /api/comparisons/{runId}/items?status=` | Field별 비교 결과 목록 | S03 "변경 없는 조건 N개" |
-| `GET /api/comparisons/items/{itemId}` | 항목 상세(Before/After/Reason/Evidence/계산근거) | S04 |
-| `POST /api/comparisons/items/{itemId}:review` | 필수 확인 처리 | S04 "확인" |
-
-### decision
-| `GET /api/comparisons/{runId}/review-gate` | 필수확인 항목 + 완료 여부 | S05 PROCEED 활성화 판단 |
-| `POST /api/comparisons/{runId}/decisions` | 결정 저장(+ signature) | S05 "현재 조건으로 약정하기", S03 "기존 절차로 계속" |
-
-### proof
-| `GET /api/decisions/{decisionId}/proof` | Proof 상태 | S06 "검증됨" 배지 |
-| `POST /api/proof/{proofId}:verify` | 재계산 검증 | S06 "기록 자세히 보기" |
-
-### consultation (경량)
-| `POST /api/comparisons/{runId}/consultation-referrals` | 상담 핸드오프 생성 | S03/S03-UNCERTAIN "상담원에게 문의" + 전송 동의 오버레이 |
-
-### 클라 조합 예시
-- S03 = `summary` + `items?status=WORSE,STRUCTURAL_CHANGE,UNKNOWN`(상단 카드) + `items?status=SAME`(count만)
-- S04 = `items/{itemId}` 단일 호출로 Before/After/Reason/Evidence/계산근거까지 한 번에
-- S05 = `review-gate`(체크박스 활성화) + `decisions` POST
-- S06 = `proof` + 필요 시 `:verify`
+| `condition` | pre-conditions, post-conditions | `condition_pre_snapshots`, `condition_post_snapshots` |
+| `comparison` | comparisons, comparisons/items | `comparison_runs`, `comparison_run_steps`, `comparison_items`, `comparison_item_evidence`, `comparison_impacts` |
+| `decision` | review-gate, signature-sessions, decisions | `decision_required_reviews`, `decisions` |
+| `proof` | proof | `proof_records`, `proof_verifications` |
+| `consultation` | consultation-referrals | `consultation_referrals` |
 
 ---
 

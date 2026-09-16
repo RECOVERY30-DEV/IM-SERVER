@@ -2,7 +2,7 @@
 
 **iM 조건체크** — 사전 안내 대출조건(V1)과 최종 약정조건(V2)을 전자서명 직전에 자동 대조하고, 달라진 조건·금전적 영향·원문 근거를 고객이 확인한 뒤 그 비교 기록의 무결성까지 검증할 수 있게 하는 서비스의 백엔드 서버. [recovery-server](https://github.com/RECOVERY30-DEV) 프로젝트의 아키텍처 컨벤션(모듈러 모놀리스 + 버티컬 슬라이스)을 그대로 이어받아 세팅했다.
 
-제품 배경/문제정의/요구사항은 [`docs/prd.md`](./docs/prd.md) (PRD v1.0, 2026-09-12 기준)가 정본이다. 화면별 API 설계 참고는 [`docs/wireframes.md`](./docs/wireframes.md), DB 스키마는 [`docs/db-design.md`](./docs/db-design.md)가 정본이다.
+제품 배경/문제정의/요구사항은 [`docs/prd.md`](./docs/prd.md) (PRD v1.0, 2026-09-12 기준)가 정본이다. 화면 매핑은 [`docs/wireframes.md`](./docs/wireframes.md), DB 스키마는 [`docs/db-design.md`](./docs/db-design.md), 리소스별 API 스펙은 [`docs/api-design.md`](./docs/api-design.md)가 정본이다.
 
 이 저장소는 2026-09-16 기준 **뼈대만 갖춘 초기 세팅 상태**다. 아직 실제 도메인 모듈(조건 스냅샷, 비교/계산 엔진, 무결성 증빙 등)은 하나도 들어있지 않고, 공통 인프라(응답 포맷/예외 처리/DB/CI/로컬 개발 환경)만 구성되어 있다. 새 기능을 추가하기 전에 `CLAUDE.md`와 `docs/prd.md`를 먼저 읽을 것.
 
@@ -57,7 +57,8 @@ docker compose up -d
 - [x] PRD v1.0 정리 (`docs/prd.md`)
 - [x] S01·S02 와이어프레임 → API 설계 참고 정리 (`docs/wireframes.md`)
 - [x] S01~S06·E01 전체 화면 기반 DB 설계 (`docs/db-design.md`) + 첫 Flyway 마이그레이션(`V1~V4`, 아직 엔티티는 없음)
-- [ ] 첫 도메인 모듈 구현 (`condition`/`comparison`/`decision`/`proof` — `docs/db-design.md` 6.5 우선순위 순으로 착수)
+- [x] 리소스별 API 설계 (`docs/api-design.md` — condition/comparison/decision/proof/consultation 리소스, 신규 ErrorCode 제안 포함)
+- [ ] 첫 도메인 모듈 구현 (`condition`/`comparison`/`decision`/`proof` — `docs/db-design.md` 6.5 우선순위 순으로 착수, `docs/api-design.md`가 Command/Query/Handler/Response 스펙)
 - [ ] 실제 MySQL에 마이그레이션 적용 검증 (이 세션은 로컬 Docker 미가용이라 SQL 문법만 검토했고 실행 검증은 못함)
 - [ ] 배포 파이프라인 (EC2/Docker Hub 등 운영 인프라가 정해지면 recovery-server의 `deploy.yml`/`deploy/` 구성 참고해서 추가)
 - [ ] 운영 도메인 확정 후 CORS 허용 origin 갱신
