@@ -1,9 +1,9 @@
 # IM 조건체크 데이터베이스 설계서 (MySQL)
 
-> 기준: `docs/prd.md` (PRD v1.0) + `docs/wireframes.md`의 S01~S06, E01 화면(Figma `공모전팀` 파일)
+> 기준: `docs/prd.md` (PRD v1.0) + `docs/wireframes.md`의 S01~S06, E01 화면(Figma `공모전팀` 파일) + `docs/implementation-spec.md` 13장(블록체인 기록 상세 명세)
 > DBMS: **MySQL 8.0** (InnoDB, `utf8mb4`)
 > 마이그레이션: Flyway (`src/main/resources/db/migration`), `spring.jpa.hibernate.ddl-auto=validate`
-> 버전: v1.0 — 최초 설계 (아직 도메인 모듈/엔티티 구현 전, 스키마만 선반영)
+> 버전: v1.1 — `proof_*`를 Blockchain Adapter Contract(13장)에 맞춰 재설계 (`V5` 마이그레이션)
 
 이 서비스는 대출 심사·승인·상품추천을 직접 수행하지 않는다(PRD 5.2 Non-goals). 따라서 고객·신청건·상품·계약서 자체는 **외부 코어뱅킹/전자약정 시스템이 원본을 소유**하고, 이 DB는 그 시스템이 내려준 값의 **불변 Snapshot과 비교·결정·증빙 기록**만 가진다. `application_id`, `customer_id`, `contract_document_id`는 모두 외부 시스템의 opaque 식별자로 취급한다.
 
@@ -38,7 +38,7 @@
 
 ---
 
-## 2. 마이그레이션 계획 (아직 미구현 — 설계만 완료)
+## 2. 마이그레이션 이력
 
 | 파일 | 내용 |
 | --- | --- |
@@ -46,8 +46,9 @@
 | `V2__create_comparison_tables.sql` | `comparison_runs`, `comparison_run_steps`, `comparison_items`, `comparison_item_evidence`, `comparison_impacts` |
 | `V3__create_decision_and_proof_tables.sql` | `decision_required_reviews`, `decisions`, `proof_records`, `proof_verifications` |
 | `V4__create_audit_and_consultation_tables.sql` | `audit_condition_events`, `consultation_referrals` |
+| `V5__align_proof_tables_with_blockchain_adapter_contract.sql` | `comparison_runs`의 `policy_version` → `prompt_version`/`rule_version`/`calculation_version` 분리, `proof_records`/`proof_verifications`를 13장(Blockchain Adapter Contract) 기준으로 재작성 |
 
-실제 SQL은 `src/main/resources/db/migration/`에 위 파일명 그대로 작성해뒀다 (엔티티는 아직 없음 — Hibernate `validate` 모드는 매핑 안 된 테이블 존재 자체는 검증하지 않으므로 먼저 스키마만 있어도 기동에 문제없다). 도메인 모듈을 실제로 만들 때 엔티티를 이 스키마에 맞춰 작성할 것.
+실제 SQL은 `src/main/resources/db/migration/`에 위 파일명 그대로 있다 (엔티티는 아직 없음 — Hibernate `validate` 모드는 매핑 안 된 테이블 존재 자체는 검증하지 않으므로 먼저 스키마만 있어도 기동에 문제없다). 도메인 모듈을 실제로 만들 때 엔티티를 이 스키마에 맞춰 작성할 것.
 
 ---
 
@@ -101,11 +102,13 @@
 | `uncertain_reason` | `EXTRACTION_FAILED`·`SOURCE_CONFLICT`·`CALCULATION_UNAVAILABLE` — S03 UNCERTAIN 변형 화면("표 위치가 달라 자동 연결 실패" 등)에 노출되는 유형 |
 | `total_steps` / `completed_steps` | S02 "6 / 8 항목" |
 | `progress_percent` | S02 게이지(파생값, `completed_steps/total_steps*100`을 앱에서 계산해 저장하거나 조회 시 계산) |
-| `policy_version` | 비교·계산 정책 Version — FR13 "같은 입력·정책 Version이면 동일 Comparison Hash" 재현성 |
+| `prompt_version` | AI 추출/설명에 쓴 프롬프트 Version (`implementation-spec.md` 13.2, 예: `extract-v1\|explain-v1`). AI를 안 쓴 필드만 있으면 NULL 가능 |
+| `rule_version` | 비교 Rule Engine Version(`comparison-rule-v1`) |
+| `calculation_version` | 계산 Engine Version(`equal-installment-v1`) |
 | `comparison_hash` | 완료 시 canonical hash |
 | `started_at` / `completed_at` | |
 
-`UNIQUE(pre_snapshot_id, post_snapshot_id, policy_version)` — 같은 조합 재계산 방지(재비교가 필요하면 정책 Version을 올리거나 새 snapshot을 사용).
+`UNIQUE(pre_snapshot_id, post_snapshot_id, rule_version, calculation_version)` — 같은 조합 재계산 방지(재비교가 필요하면 Rule/Calculation Version을 올리거나 새 snapshot을 사용). FR13 재현성("같은 입력·정책 Version이면 동일 Comparison Hash")은 이 세 Version + snapshot 조합으로 성립한다 — 세 Version을 하나로 뭉뚱그리지 않는 이유는 `implementation-spec.md` 13.2 Canonical Payload가 `promptVersion`/`ruleVersion`/`calculationVersion`을 각각 별도 필드로 On-chain에 남기기 때문(AI를 안 쓴 재계산과 AI 프롬프트만 바뀐 재추출을 구분해서 감사할 수 있어야 함).
 
 **`comparison_run_steps`** (S02 4개 체크리스트 — 내부 처리 단계와 UI 표시 그룹을 분리)
 | 컬럼 | 설명 |
@@ -193,18 +196,28 @@
 
 ### 3.4 `proof_` — 무결성 검증
 
+`implementation-spec.md` 13장(Blockchain Adapter Contract)을 그대로 반영한 구조. 컬럼명은 13.2 Canonical Proof Payload의 필드명과 1:1로 맞춰서, Off-chain에 저장된 값으로 언제든 Payload를 재구성 → 재해싱 → 원장 대조(13.7 `verify()`)할 수 있게 한다.
+
 **`proof_records`** (FR13, S06 "조건 확인 기록 · 검증됨")
 | 컬럼 | 설명 |
 | --- | --- |
-| `id` | PK |
+| `id` | PK(내부 surrogate) |
 | `decision_id` | FK, `UNIQUE` |
-| `pre_snapshot_hash` / `post_snapshot_hash` / `comparison_hash` / `decision_hash` | 각 단계 Hash |
-| `policy_version` | |
-| `proof_payload_hash` | 위 값+Version을 묶은 canonical Payload의 최종 Hash — On-chain/원장에 실제로 기록되는 값 (12.4 경계) |
-| `anchor_status` | `PENDING`·`ANCHORED`·`FAILED` |
-| `anchor_tx_ref` | 원장 트랜잭션/레코드 참조(opaque) |
-| `anchor_retry_count` | FR14: 원장 장애 시 비동기 재시도 횟수 |
-| `anchored_at` | |
+| `proof_id` | 13.2의 `proofId` (예: `proof_01`) — Off-chain에서 이 Proof를 가리키는 외부 식별자, `UNIQUE` |
+| `record_id_hash` | 13.3.6 "recordId는 proofId를 직접 쓰지 않고 조직 Salt를 포함한 단방향 Hash로 생성" — 실제 원장에 올라가는 `recordId`, `UNIQUE` |
+| `schema_version` | 기본 `1.0` |
+| `check_id_hash` / `application_id_hash` | `comparison_run_id` / `application_id`를 각각 Salt와 함께 Hash한 값 — 원문 식별자를 On-chain에 노출하지 않기 위함(13.1) |
+| `v1_snapshot_hash` / `v2_snapshot_hash` / `comparison_result_hash` / `decision_hash` | 각 단계 원문의 canonical Hash |
+| `issuer_id` | 13.5 "쓰기 권한은 승인된 Issuer만" — 이 Proof를 발급한 Issuer |
+| `prompt_version` / `rule_version` / `calculation_version` | 해당 `comparison_runs` 행의 값을 그대로 복사(Payload 재구성용 — run이 나중에 바뀌어도 anchoring 당시 Version이 고정되도록) |
+| `payload_hash` | Canonical Payload 전체의 SHA-256 — On-chain에 실제로 기록되는 값 |
+| `supersedes_record_id_hash` | 이전 Proof를 대체하는 경우만 채움(13.5 "Update·Delete 대신 새 recordId + supersedesRecordId") |
+| `anchor_status` | `PENDING`→`SUBMITTED`→`CONFIRMED`\|`FAILED` (13.6) |
+| `ledger_reference` | `anchorRecord()` 응답의 `ledgerReference` |
+| `confirmation_count` | `getConfirmation()` 응답 캐시 |
+| `submitted_at` / `confirmed_at` | |
+| `anchor_retry_count` / `next_retry_at` | 13.6 재시도 스케줄(1·5·15·60분 간격, 최대 8회) 진행 상태 |
+| `created_at` | |
 
 **`proof_verifications`** (S06 "기록 자세히 보기", 사후 검증 요청 이력)
 | 컬럼 | 설명 |
@@ -213,7 +226,8 @@
 | `proof_record_id` | FK |
 | `requested_by` | `CUSTOMER`·`COUNSELOR`·`COMPLIANCE`·`SYSTEM` |
 | `recomputed_hash` | 검증 시 Off-chain Payload로 재계산한 Hash |
-| `is_match` | `recomputed_hash == proof_payload_hash` |
+| `verify_result` | `VERIFIED`·`NOT_ANCHORED`·`HASH_MISMATCH` — 13.7 `verify()`의 반환 사유 그대로 |
+| `ledger_recorded_at` | 원장 조회 성공 시 `record.recordedAt` |
 | `verified_at` | |
 
 ### 3.5 `consultation_referrals` (경량 — 실제 상담은 Non-goal)
@@ -343,4 +357,5 @@ decision_required_reviews 전체 reviewed_at NOT NULL 확인
 3. **전자서명 원본 보관 위치** — PRD 12.4는 "Decision·전자서명 원문은 Off-chain"이라고만 명시. 서명 이미지 자체를 이 DB에 저장할지, 외부 전자서명 시스템 참조 ID만 가질지 미정 (`decisions` 테이블에 `signature_ref` 컬럼 추가 여지).
 4. **재비교 허용 범위** — 같은 `application_id`에 대해 `condition_post_snapshots`가 여러 번 생성될 수 있는지(재산정), 그때마다 `comparison_runs`를 몇 개까지 유지할지 보관 정책.
 5. **`comparison_items.v1_value_numeric`/`v2_value_numeric`의 단위 통일** — 금액(원)과 비율(%)이 같은 컬럼을 공유하는 설계라 `unit` 값에 따른 애플리케이션 레벨 검증이 필요.
-6. **Proof anchor 대상(원장) 선정 전까지 `anchor_tx_ref` 포맷 미정** — 실제 체인/원장 선택 후 포맷 확정.
+6. **Proof anchor 대상(원장) 선정 전까지 `ledger_reference` 포맷 미정** — 네트워크·SDK는 `implementation-spec.md` 13장이 의도적으로 지정하지 않았음, `BlockchainAdapter` 구현체 선정 후 확정.
+7. **역할 분리(고객/상담원/운영자/AI Worker/Ledger Writer) 미반영** — `implementation-spec.md` 14장이 요구하는 권한 분리를 적용할 인증·인가 모듈이 아직 없음. 첫 인증 모듈을 만들 때 이 역할 구분을 반드시 반영할 것.

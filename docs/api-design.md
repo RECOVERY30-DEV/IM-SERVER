@@ -171,28 +171,30 @@ S05 "현재 조건으로 약정하기" / S05 "다시 검토" / S03 "기존 절�
 
 **화면**: S06(약정 완료와 검증기록)
 
+필드/상태값은 `docs/implementation-spec.md` 13장(Blockchain Adapter Contract)을 그대로 따른다.
+
 ### `GET /api/decisions/{decisionId}/proof`
 S06 상단 요약 + "검증됨" 배지.
 
 | 필드 | 설명 |
 | --- | --- |
 | `contractNumber`, `loanAmount`, `finalRatePercent`, `decidedAt` | S06 "약정번호 IM-260912-0182" 등 |
-| `anchorStatus` | `PENDING`\|`ANCHORED`\|`FAILED` — 배지 표시(`ANCHORED`만 "검증됨") |
+| `anchorStatus` | `PENDING`\|`SUBMITTED`\|`CONFIRMED`\|`FAILED` — 배지는 `CONFIRMED`일 때만 "검증됨" |
 | `recordSummary` | `{ changedItemsCount, allReviewed, evidenceLinked }` — "변경 3건 · 확인 완료 · 원문 연결 완료" |
 
 ### `GET /api/proof/{proofId}`
-"기록 자세히 보기" — Hash 목록·anchor 상세.
+"기록 자세히 보기" — Canonical Payload 필드·anchor 상세.
 
 | 필드 | 설명 |
 | --- | --- |
-| `preSnapshotHash`, `postSnapshotHash`, `comparisonHash`, `decisionHash`, `proofPayloadHash`, `policyVersion` | |
-| `anchorStatus`, `anchorTxRef`, `anchoredAt`, `anchorRetryCount` | |
+| `schemaVersion`, `checkIdHash`, `applicationIdHash`, `v1SnapshotHash`, `v2SnapshotHash`, `comparisonResultHash`, `decisionHash`, `issuerId`, `promptVersion`, `ruleVersion`, `calculationVersion`, `payloadHash` | 13.2 Canonical Proof Payload와 동일 필드 |
+| `anchorStatus`, `ledgerReference`, `confirmationCount`, `submittedAt`, `confirmedAt`, `anchorRetryCount` | 13.6 제출·재시도 상태 |
 
 ### `POST /api/proof/{proofId}:verify`
-사후 검증(Off-chain Payload로 Hash 재계산 후 원장값과 대조).
+13.7 `verify(proofId)` 로직 그대로: Off-chain Payload로 Hash 재계산 → `BlockchainAdapter.getRecord()` 조회 → 대조.
 
-| Response | `isMatch`, `recomputedHash`, `verifiedAt` |
-| 실패 | `PROOF_409_1`(`anchorStatus != ANCHORED`인데 검증 시도 — anchoring 대기 중), `PROOF_500_1`(재계산-원장 불일치, 운영 Alert 트리거) |
+| Response | `verified`(bool), `reason`(`NOT_ANCHORED`\|`HASH_MISMATCH`\|`null`), `recomputedHash`, `ledgerReference`, `recordedAt` |
+| 실패 | 이 엔드포인트 자체는 200으로 결과를 반환한다(검증 실패도 정상 응답, `verified:false` + `reason`으로 표현) — `PROOF_500_1`은 `HASH_MISMATCH`가 나왔을 때 운영 Alert를 트리거하기 위한 내부 이벤트 코드이지 HTTP 에러가 아님 |
 
 ---
 
@@ -243,8 +245,7 @@ S06 상단 요약 + "검증됨" 배지.
 | `DECISION_400_2` | 400 | `allReviewed=false`인데 `PROCEED` 시도 |
 | `DECISION_409_1` | 409 | 서명 세션 만료 |
 | `DECISION_409_2` | 409 | 결정 시점 계약서 Version 불일치 |
-| `PROOF_409_1` | 409 | anchoring 완료 전 검증 시도 |
-| `PROOF_500_1` | 500 | 재계산 Hash와 원장 Hash 불일치 |
+| `PROOF_404_1` | 404 | 존재하지 않는 proofId |
 
 ---
 
