@@ -1,0 +1,15 @@
+services:
+  app:
+    container_name: im-app
+    image: haul123/im-server:${TAG:-latest}
+    ports:
+      - "8090:8080"
+    mem_limit: 400m
+    restart: unless-stopped
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
