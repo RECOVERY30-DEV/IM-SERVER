@@ -131,12 +131,14 @@ src/main/java/com/im/server
 - spotless 대상은 `src/**/*.java`만 — QueryDSL이 생성하는 `build/generated/querydsl`은 제외되어 있음
 
 ## 인프라 / 배포
-- **recovery-server와 같은 EC2**에 올린다. recovery-server는 그 EC2에서 nginx + blue/green(8080/8081)으로 `recovery-30.shop`을 서비스하고 있고, 이 서버는 건드리지 않는다 — IM-SERVER는 같은 EC2에 **별도 컨테이너, 별도 포트(8090)** 로 뜬다
-- **아직 도메인이 없다.** `http://<EC2 IP>:8090`으로 직접 접근(Swagger UI: `http://<EC2 IP>:8090/swagger-ui/index.html`). 나중에 도메인이 생기면 recovery-server처럼 nginx `server_name` 가상호스팅 + 인증서 추가로 전환 가능(기존 recovery-30.shop 설정에는 영향 없음)
+- **운영 주소: `https://im.recovery-30.shop`** (2026-09-20 연결 완료). Swagger UI `https://im.recovery-30.shop/swagger-ui/index.html`, 헬스체크 `https://im.recovery-30.shop/actuator/health`
+- **recovery-server와 같은 EC2**에 올린다. recovery-server는 그 EC2에서 nginx + blue/green(8080/8081)으로 `recovery-30.shop`을 서비스하고 있고, 이 서버는 건드리지 않는다 — IM-SERVER는 같은 EC2에 **별도 컨테이너(내부 포트 8090)** 로 뜨고, nginx가 `server_name` 기반 가상호스팅으로 `im.recovery-30.shop` 요청만 그 컨테이너로 넘긴다
+- nginx 설정은 EC2의 `/etc/nginx/conf.d/im-service.conf`에 있다(참고용 사본: `deploy/nginx/im-service.conf` — **이 저장소의 배포 자동화 대상이 아니라 수동 반영 필요**, 고치면 `scp` 후 EC2에서 `sudo nginx -t && sudo nginx -s reload`). recovery-30.shop의 `service.conf`와 별도 파일이라 서로 독립적으로 수정 가능하지만, `listen [::]:443 ssl ipv6only=on;`처럼 프로세스 전체에 한 번만 선언 가능한 옵션이 있으니 새 서버 블록 추가 시 주의(중복 시 `nginx -t`가 `duplicate listen options`로 막아줌)
+- SSL 인증서는 `certbot certonly --nginx -d im.recovery-30.shop`으로 recovery-30.shop과 **별도 발급**했다(`/etc/letsencrypt/live/im.recovery-30.shop/`) — 자동 갱신 대상에 포함됨. DNS는 `im.recovery-30.shop` A레코드 → EC2 IP를 도메인 등록기관(Route53 아님, 이 프로젝트 AWS IAM 계정엔 Route53 권한 없음)에서 직접 추가했음
 - recovery-server와 달리 **블루그린이 아니다** — `deploy/deploy.sh`는 컨테이너를 그 자리에서 교체하는 단일 컨테이너 배포라 재배포 중 짧은 다운타임이 있고, 헬스체크 실패 시 자동 롤백도 없다(수동으로 이전 TAG 재배포 필요). 트래픽이 늘거나 무중단이 필요해지면 recovery-server의 blue/green 패턴으로 승격할 것
-- `.github/workflows/deploy.yml`이 `main` push 시 Docker Hub(`haul123/im-server`, recovery-server와 같은 계정을 쓴다고 가정 — 다르면 `IMAGE`와 `DOCKER_USERNAME`/`DOCKER_PASSWORD` secret 값을 바꿀 것)로 이미지를 빌드/푸시하고 EC2에 SSH로 배포한다. **이 저장소(RECOVERY30-DEV/IM-SERVER)에 별도로 설정해야 하는 GitHub Actions secrets**: `DOCKER_USERNAME`, `DOCKER_PASSWORD`, `EC2_HOST`, `EC2_SSH_KEY`(recovery-server와 같은 EC2면 값도 동일), `IM_DB_HOST`, `IM_DB_PORT`, `IM_DB_NAME`, `IM_DB_USERNAME`, `IM_DB_PASSWORD` (recovery-server의 `DB_*` secret과 이름을 다르게 둬서 두 프로젝트의 DB 설정이 섞이지 않게 함 — recovery-server와 같은 DB 서버를 쓸지, DB만 새로 만들지는 아직 미정)
-- EC2 보안 그룹에 **8090 포트 인바운드**를 열어야 외부에서 접근 가능 (AWS 콘솔에서 직접 설정 필요, 이 저장소 코드로는 안 됨)
-- Swagger UI는 기본적으로 인증 없이 열려 있다 — 도메인 연결 등 실제 서비스 전환 시 `springdoc.swagger-ui.enabled=false` 등으로 막을 것
+- `.github/workflows/deploy.yml`이 `main` push 시 Docker Hub(`haul123/im-server`)로 이미지를 빌드/푸시하고 EC2에 SSH로 배포한다(nginx 설정 자체는 건드리지 않음 — 컨테이너만 재기동). GitHub Actions secrets(`DOCKER_USERNAME`, `DOCKER_PASSWORD`, `EC2_HOST`, `EC2_SSH_KEY`, `IM_DB_HOST`, `IM_DB_PORT`, `IM_DB_NAME`, `IM_DB_USERNAME`, `IM_DB_PASSWORD`)와 EC2 보안그룹 8090 포트 인바운드는 이미 등록·오픈되어 있음(2026-09-19)
+- 프론트엔드 주소가 정해지면 `application.properties`의 `app.cors.allowed-origins` 기본값에 추가하거나 배포 시 `CORS_ALLOWED_ORIGINS` 환경변수로 덮어쓸 것 (지금은 로컬 개발 주소만 허용)
+- Swagger UI는 기본적으로 인증 없이 열려 있다 — 실제 서비스 전환 시 `springdoc.swagger-ui.enabled=false` 등으로 막을 것
 
 ## 빌드 / 실행 명령
 ```bash

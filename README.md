@@ -35,10 +35,11 @@ docker compose up -d
 - 헬스체크: http://localhost:8080/actuator/health
 
 ## 배포 (운영)
-- `main`에 머지되면 GitHub Actions(`.github/workflows/deploy.yml`)가 recovery-server와 **같은 EC2**에 IM-SERVER를 별도 컨테이너(포트 8090)로 배포한다 — recovery-30.shop 쪽 설정은 건드리지 않는다
-- 아직 도메인이 없어 `http://<EC2 IP>:8090`으로 직접 접근한다 (Swagger UI: `http://<EC2 IP>:8090/swagger-ui/index.html`)
+- **운영 주소: `https://im.recovery-30.shop`** (Swagger UI: `https://im.recovery-30.shop/swagger-ui/index.html`, 헬스체크: `https://im.recovery-30.shop/actuator/health`)
+- `main`에 머지되면 GitHub Actions(`.github/workflows/deploy.yml`)가 recovery-server와 **같은 EC2**에 IM-SERVER를 별도 컨테이너(내부 포트 8090)로 배포한다 — recovery-30.shop 쪽 설정·트래픽은 건드리지 않는다
+- `im.recovery-30.shop` → nginx(같은 EC2, `server_name` 기반 가상호스팅, 인증서는 recovery-30.shop과 별도 발급) → `127.0.0.1:8090` 순서로 연결된다. nginx 설정은 서버에만 있고 배포 자동화 대상이 아니다 — 참고용 사본이 `deploy/nginx/im-service.conf`에 있다(수정 시 EC2에도 수동으로 반영해야 함)
 - recovery-server의 blue/green 무중단 배포와 달리 단일 컨테이너 배포라 재배포 중 짧은 다운타임이 있다
-- 처음 배포하기 전에 필요한 것(코드로는 안 되는 부분): GitHub Actions secrets 등록, EC2 보안그룹 8090 포트 오픈 — 자세한 목록은 `CLAUDE.md`의 "인프라 / 배포" 절 참고
+- 처음 배포하기 전에 필요한 것(코드로는 안 되는 부분): GitHub Actions secrets 등록, EC2 보안그룹 8090 포트 오픈, DNS A레코드(`im` → EC2 IP), nginx+certbot 설정 — 자세한 목록은 `CLAUDE.md`의 "인프라 / 배포" 절 참고
 
 ## 빌드 / 테스트
 ```bash
@@ -72,6 +73,7 @@ docker compose up -d
 - [x] 실제 운영 RDS(`im` 스키마)에 매 배포마다 직접 붙여서 Hibernate `ddl-auto=validate` 통과 확인 — H2 테스트는 마이그레이션을 안 타므로 이 확인을 대체하지 못함(V6에서 실제로 타입 불일치를 잡은 적 있음)
 - [x] 배포 파이프라인 (`deploy/`, `.github/workflows/deploy.yml`) — recovery-server와 같은 EC2, 8090 포트에 단일 컨테이너로 배포
 - [x] GitHub Actions secrets 등록 + EC2 보안그룹 8090 포트 오픈 (2026-09-19 완료)
-- [ ] 운영 도메인이 생기면 CORS 허용 origin 갱신 + nginx 가상호스팅으로 전환
+- [x] 운영 도메인 연결 (`https://im.recovery-30.shop`, nginx 가상호스팅 + 별도 인증서, 2026-09-20 완료)
+- [ ] 프론트엔드 주소가 정해지면 `CORS_ALLOWED_ORIGINS`에 추가 (현재는 로컬 개발 주소만 허용)
 - [ ] 인증/인가(고객·상담원·운영자·AI Worker·Ledger Writer 역할 분리, `implementation-spec.md` 14장) — 아직 없음. `proof` 검증 API의 `requestedBy`가 항상 `SYSTEM`으로 기록되는 것도 이 때문
 - [ ] 실제 블록체인 네트워크 선정 시 `proof.internal.MockBlockchainAdapter`를 `proof.api.BlockchainAdapter` 새 구현체로 교체
