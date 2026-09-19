@@ -101,7 +101,9 @@ src/main/java/com/im/server
 ### DB / 마이그레이션
 - 스키마는 [`docs/db-design.md`](./docs/db-design.md)가 정본이다 — 새 테이블을 설계하기 전에 먼저 확인할 것 (테이블 접두사 = 모듈, 3장에 컬럼별 근거)
 - 스키마는 Flyway가 관리한다 (`spring.jpa.hibernate.ddl-auto=validate`) — 엔티티만 고치고 마이그레이션을 안 만들면 애플리케이션이 기동 실패한다
-- 새 테이블/컬럼이 필요하면 `src/main/resources/db/migration/V{n}__{설명}.sql` 추가 (다음 버전 번호는 기존 파일 중 가장 큰 `V{n}` + 1, 현재 `V4`까지 존재 — condition/comparison/decision·proof/audit·consultation 테이블, 엔티티는 아직 없음)
+- 새 테이블/컬럼이 필요하면 `src/main/resources/db/migration/V{n}__{설명}.sql` 추가 (다음 버전 번호는 기존 파일 중 가장 큰 `V{n}` + 1, 현재 `V6`까지 존재)
+- **엔티티 필드 타입과 마이그레이션 컬럼 타입을 정확히 맞출 것** — 특히 숫자류(`SMALLINT`/`INT`/`BIGINT`)는 Hibernate `validate`가 엄격하게 검사해서 하나만 안 맞아도 기동 자체가 실패한다(운영 배포 중 `comparison_runs.progress_percent`가 `SMALLINT`인데 엔티티는 `int`→`INTEGER`라 실패했던 사례가 `V6`). `VARCHAR` 길이나 `CHAR`/`VARCHAR` 차이, `BigDecimal`의 명시 안 한 precision/scale은 이 프로젝트 Hibernate 버전에서는 관대하게 통과하더라 — 그래도 숫자 타입만큼은 항상 실제 MySQL로 확인할 것
+- **로컬 H2 테스트(`ddl-auto=create-drop`)는 Flyway 마이그레이션을 아예 안 타서 위 같은 불일치를 못 잡는다** — 새 컬럼을 추가했으면 최소한 한 번은 `docker compose up -d`로 띄운 실제 MySQL에 `SPRING_PROFILES_ACTIVE` 없이(즉 `application.properties` 그대로) 붙여서 기동이 되는지 확인할 것
 - 로컬 개발 DB는 `docker compose up -d` (MySQL, `.env` 없으면 root/root/im/3306 기본값 사용)
 - 클라우드 DB에 직접 붙어야 할 때만 `application-local.yml`을 만들어 쓴다 (gitignore 대상, `SPRING_PROFILES_ACTIVE=local`로 활성화)
 
