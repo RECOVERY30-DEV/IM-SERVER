@@ -34,6 +34,12 @@ docker compose up -d
 - API 문서: http://localhost:8080/swagger-ui/index.html
 - 헬스체크: http://localhost:8080/actuator/health
 
+## 배포 (운영)
+- `main`에 머지되면 GitHub Actions(`.github/workflows/deploy.yml`)가 recovery-server와 **같은 EC2**에 IM-SERVER를 별도 컨테이너(포트 8090)로 배포한다 — recovery-30.shop 쪽 설정은 건드리지 않는다
+- 아직 도메인이 없어 `http://<EC2 IP>:8090`으로 직접 접근한다 (Swagger UI: `http://<EC2 IP>:8090/swagger-ui/index.html`)
+- recovery-server의 blue/green 무중단 배포와 달리 단일 컨테이너 배포라 재배포 중 짧은 다운타임이 있다
+- 처음 배포하기 전에 필요한 것(코드로는 안 되는 부분): GitHub Actions secrets 등록, EC2 보안그룹 8090 포트 오픈 — 자세한 목록은 `CLAUDE.md`의 "인프라 / 배포" 절 참고
+
 ## 빌드 / 테스트
 ```bash
 ./gradlew build            # 빌드
@@ -62,5 +68,6 @@ docker compose up -d
 - [ ] `proof` 모듈 구현 (Blockchain Adapter Contract, `implementation-spec.md` 13장) — 스키마(`V5`)만 있고 코드 없음
 - [ ] `comparison_run_steps`/`comparison_item_evidence`(AI Reason·Evidence) 구현 — 지금은 비교가 동기로 즉시 끝나 진행상태 UI(S02)가 항상 100%로만 보이고, S04의 "확인된 변경 사유"·원문 근거 링크는 응답에 없음
 - [ ] 실제 MySQL에 마이그레이션 적용 검증 (이 세션은 로컬 Docker 미가용이라 SQL 문법만 검토했고 실행 검증은 못함, H2 기반 테스트로 로직만 검증)
-- [ ] 배포 파이프라인 (EC2/Docker Hub 등 운영 인프라가 정해지면 recovery-server의 `deploy.yml`/`deploy/` 구성 참고해서 추가)
-- [ ] 운영 도메인 확정 후 CORS 허용 origin 갱신
+- [x] 배포 파이프라인 (`deploy/`, `.github/workflows/deploy.yml`) — recovery-server와 같은 EC2, 8090 포트에 단일 컨테이너로 배포
+- [x] GitHub Actions secrets 등록 + EC2 보안그룹 8090 포트 오픈 (2026-09-19 완료)
+- [ ] 운영 도메인이 생기면 CORS 허용 origin 갱신 + nginx 가상호스팅으로 전환

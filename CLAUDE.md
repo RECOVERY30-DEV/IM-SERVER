@@ -116,9 +116,12 @@ src/main/java/com/im/server
 - spotless 대상은 `src/**/*.java`만 — QueryDSL이 생성하는 `build/generated/querydsl`은 제외되어 있음
 
 ## 인프라 / 배포
-- 아직 운영 인프라가 정해지지 않았다. `.github/workflows/`에는 CI(테스트/포맷 검증)만 있고 배포 워크플로우는 없음
-- 배포 대상(EC2/컨테이너 플랫폼 등)과 도메인이 정해지면 recovery-server의 `.github/workflows/deploy.yml`, `deploy/docker-compose.yaml`, `deploy/deploy.sh` 구조(블루그린 배포, 헬스체크 실패 시 자동 롤백)를 참고해서 이 저장소에도 추가할 것
-- Swagger UI는 기본적으로 인증 없이 열려 있다 — 실제 서비스 전환 시 `springdoc.swagger-ui.enabled=false` 등으로 막을 것
+- **recovery-server와 같은 EC2**에 올린다. recovery-server는 그 EC2에서 nginx + blue/green(8080/8081)으로 `recovery-30.shop`을 서비스하고 있고, 이 서버는 건드리지 않는다 — IM-SERVER는 같은 EC2에 **별도 컨테이너, 별도 포트(8090)** 로 뜬다
+- **아직 도메인이 없다.** `http://<EC2 IP>:8090`으로 직접 접근(Swagger UI: `http://<EC2 IP>:8090/swagger-ui/index.html`). 나중에 도메인이 생기면 recovery-server처럼 nginx `server_name` 가상호스팅 + 인증서 추가로 전환 가능(기존 recovery-30.shop 설정에는 영향 없음)
+- recovery-server와 달리 **블루그린이 아니다** — `deploy/deploy.sh`는 컨테이너를 그 자리에서 교체하는 단일 컨테이너 배포라 재배포 중 짧은 다운타임이 있고, 헬스체크 실패 시 자동 롤백도 없다(수동으로 이전 TAG 재배포 필요). 트래픽이 늘거나 무중단이 필요해지면 recovery-server의 blue/green 패턴으로 승격할 것
+- `.github/workflows/deploy.yml`이 `main` push 시 Docker Hub(`haul123/im-server`, recovery-server와 같은 계정을 쓴다고 가정 — 다르면 `IMAGE`와 `DOCKER_USERNAME`/`DOCKER_PASSWORD` secret 값을 바꿀 것)로 이미지를 빌드/푸시하고 EC2에 SSH로 배포한다. **이 저장소(RECOVERY30-DEV/IM-SERVER)에 별도로 설정해야 하는 GitHub Actions secrets**: `DOCKER_USERNAME`, `DOCKER_PASSWORD`, `EC2_HOST`, `EC2_SSH_KEY`(recovery-server와 같은 EC2면 값도 동일), `IM_DB_HOST`, `IM_DB_PORT`, `IM_DB_NAME`, `IM_DB_USERNAME`, `IM_DB_PASSWORD` (recovery-server의 `DB_*` secret과 이름을 다르게 둬서 두 프로젝트의 DB 설정이 섞이지 않게 함 — recovery-server와 같은 DB 서버를 쓸지, DB만 새로 만들지는 아직 미정)
+- EC2 보안 그룹에 **8090 포트 인바운드**를 열어야 외부에서 접근 가능 (AWS 콘솔에서 직접 설정 필요, 이 저장소 코드로는 안 됨)
+- Swagger UI는 기본적으로 인증 없이 열려 있다 — 도메인 연결 등 실제 서비스 전환 시 `springdoc.swagger-ui.enabled=false` 등으로 막을 것
 
 ## 빌드 / 실행 명령
 ```bash
