@@ -1,6 +1,6 @@
 package com.im.server.decision.submitdecision;
 
-import com.im.server.decision.domain.DecisionType;
+import com.im.server.decision.api.DecisionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 

@@ -1,23 +1,23 @@
 package com.im.server.decision.submitdecision;
 
 import com.im.server.comparison.api.ComparisonApi;
-import com.im.server.comparison.api.ComparisonItemView;
 import com.im.server.comparison.api.ComparisonRunStatus;
 import com.im.server.comparison.api.ComparisonRunView;
 import com.im.server.condition.api.ConditionApi;
+import com.im.server.decision.api.DecisionType;
 import com.im.server.decision.domain.Decision;
-import com.im.server.decision.domain.DecisionRequiredReview;
-import com.im.server.decision.domain.DecisionType;
+import com.im.server.decision.domain.SignatureSession;
 import com.im.server.decision.internal.DecisionRepository;
-import com.im.server.decision.internal.DecisionRequiredReviewRepository;
+import com.im.server.decision.internal.ReviewGateEvaluator;
+import com.im.server.decision.internal.SignatureSessionRepository;
+import com.im.server.shared.event.DecisionSubmittedEvent;
 import com.im.server.shared.exception.BusinessException;
 import com.im.server.shared.exception.ErrorCode;
 import com.im.server.shared.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.time.Instant;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,20 +38,26 @@ public class SubmitDecisionHandler {
   private final ComparisonApi comparisonApi;
   private final ConditionApi conditionApi;
   private final DecisionRepository decisionRepository;
-  private final DecisionRequiredReviewRepository decisionRequiredReviewRepository;
+  private final SignatureSessionRepository signatureSessionRepository;
+  private final ReviewGateEvaluator reviewGateEvaluator;
+  private final ApplicationEventPublisher eventPublisher;
 
   public SubmitDecisionHandler(
       ComparisonApi comparisonApi,
       ConditionApi conditionApi,
       DecisionRepository decisionRepository,
-      DecisionRequiredReviewRepository decisionRequiredReviewRepository) {
+      SignatureSessionRepository signatureSessionRepository,
+      ReviewGateEvaluator reviewGateEvaluator,
+      ApplicationEventPublisher eventPublisher) {
     this.comparisonApi = comparisonApi;
     this.conditionApi = conditionApi;
     this.decisionRepository = decisionRepository;
-    this.decisionRequiredReviewRepository = decisionRequiredReviewRepository;
+    this.signatureSessionRepository = signatureSessionRepository;
+    this.reviewGateEvaluator = reviewGateEvaluator;
+    this.eventPublisher = eventPublisher;
   }
 
-  @Operation(summary = "약정 결정 저장", description = "PROCEED는 필수 확인이 모두 끝나야 저장할 수 있다.")
+  @Operation(summary = "약정 결정 저장", description = "PROCEED는 필수 확인이 모두 끝나고 유효한 서명 세션이 있어야 저장할 수 있다.")
   @PostMapping("/api/comparisons/{comparisonId}/decisions")
   public ResponseEntity<ApiResponse<SubmitDecisionResponse>> handle(
       @PathVariable Long comparisonId, @RequestBody SubmitDecisionCommand command) {
@@ -67,9 +73,20 @@ public class SubmitDecisionHandler {
               throw new BusinessException(ErrorCode.DECISION_ALREADY_SUBMITTED);
             });
 
-    boolean allReviewed = isAllReviewed(comparisonId);
-    if (command.decisionType() == DecisionType.PROCEED && !allReviewed) {
-      throw new BusinessException(ErrorCode.DECISION_REVIEW_GATE_NOT_CLEARED);
+    boolean allReviewed = reviewGateEvaluator.isAllReviewed(comparisonId);
+
+    if (command.decisionType() == DecisionType.PROCEED) {
+      if (!allReviewed) {
+        throw new BusinessException(ErrorCode.DECISION_REVIEW_GATE_NOT_CLEARED);
+      }
+      validateSignatureSession(comparisonId, command.signatureSessionId());
+      // FR03 — 서명 세션 발급 이후 최종 약정서 Version이 또 바뀌었으면(재심사 등) 재비교부터 다시 해야 한다.
+      if (!conditionApi
+          .getLatestPostSnapshot(run.applicationId())
+          .id()
+          .equals(run.postSnapshotId())) {
+        throw new BusinessException(ErrorCode.DECISION_CONTRACT_VERSION_CHANGED);
+      }
     }
 
     String contractDocumentHash =
@@ -85,22 +102,28 @@ public class SubmitDecisionHandler {
             contractDocumentHash);
     decisionRepository.save(decision);
 
+    if (decision.getDecisionType() == DecisionType.PROCEED) {
+      eventPublisher.publishEvent(new DecisionSubmittedEvent(decision.getId(), comparisonId));
+    }
+
     return ResponseEntity.ok(
         ApiResponse.success(
             new SubmitDecisionResponse(
                 decision.getId(), decision.getDecisionType(), decision.getSignedAt())));
   }
 
-  private boolean isAllReviewed(Long comparisonId) {
-    List<ComparisonItemView> requiredItems = comparisonApi.listRequiredReviewItems(comparisonId);
-    if (requiredItems.isEmpty()) {
-      return true;
+  private void validateSignatureSession(Long comparisonId, String signatureSessionId) {
+    if (signatureSessionId == null || signatureSessionId.isBlank()) {
+      throw new BusinessException(ErrorCode.DECISION_SIGNATURE_SESSION_INVALID);
     }
-    Set<Long> reviewedItemIds =
-        decisionRequiredReviewRepository.findByComparisonRunId(comparisonId).stream()
-            .filter(DecisionRequiredReview::isReviewed)
-            .map(DecisionRequiredReview::getComparisonItemId)
-            .collect(Collectors.toSet());
-    return requiredItems.stream().map(ComparisonItemView::id).allMatch(reviewedItemIds::contains);
+    SignatureSession session =
+        signatureSessionRepository
+            .findBySessionId(signatureSessionId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.DECISION_SIGNATURE_SESSION_INVALID));
+    if (!session.isUsable(comparisonId, Instant.now())) {
+      throw new BusinessException(ErrorCode.DECISION_SIGNATURE_SESSION_INVALID);
+    }
+    session.markUsed();
+    signatureSessionRepository.save(session);
   }
 }

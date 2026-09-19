@@ -52,15 +52,28 @@ src/main/java/com/im/server
 │   ├── listcomparisonitems/
 │   ├── getcomparisonitem/
 │   └── internal/                 ← ComparisonEngine(Rule), EqualInstallmentCalculator(Calculation), Repository, ComparisonApiImpl
-├── decision/                   ← Review Gate·전자서명 (FR11, FR12) — 아직 api/ 없음(다른 모듈이 필요로 하면 추가)
-│   ├── domain/                   ← DecisionRequiredReview, Decision
+├── decision/                   ← Review Gate·서명세션·전자서명 (FR11, FR12)
+│   ├── api/                     ← DecisionApi, DecisionView, DecisionType
+│   ├── domain/                   ← DecisionRequiredReview, Decision, SignatureSession
 │   ├── getreviewgate/
 │   ├── reviewcomparisonitem/
-│   ├── submitdecision/
-│   └── internal/                 ← Repository, ReviewGateSync
-├── (proof, consultation — docs/db-design.md 스키마만 있고 아직 미구현)
+│   ├── issuesignaturesession/
+│   ├── submitdecision/           ← PROCEED 저장 시 DecisionSubmittedEvent 발행 (proof 모듈이 구독)
+│   └── internal/                 ← Repository, ReviewGateEvaluator, DecisionApiImpl
+├── proof/                      ← 무결성 증빙 (FR13, implementation-spec.md 13장)
+│   ├── api/                     ← BlockchainAdapter 계약, AnchorStatus, LedgerStatus 등
+│   ├── domain/                   ← ProofRecord, ProofVerification
+│   ├── getproofstatus/           ← S06 요약(GET /decisions/{id}/proof)
+│   ├── getproofdetail/           ← "기록 자세히 보기"(GET /proof/{proofId})
+│   ├── verifyproof/              ← 재검증(POST /proof/{proofId}:verify)
+│   └── internal/                 ← MockBlockchainAdapter(목 원장), ProofAnchoringService,
+│                                    CanonicalProofPayloadFactory, DecisionSubmittedEventListener
+├── consultation/               ← 상담 핸드오프 (경량, 실제 상담 연동은 Non-goal)
+│   ├── domain/                   ← ConsultationReferral
+│   ├── createconsultationreferral/
+│   └── internal/                 ← Repository
 └── shared/                    ← 공유 커널
-    ├── event/                 ← 모듈 간 비동기 통신 (아직 미사용 — 현재는 comparison→condition 같은 동기 호출만 있음)
+    ├── event/                 ← 모듈 간 비동기 통신 — DecisionSubmittedEvent(decision → proof)가 첫 실사용 사례
     ├── response/               ← 공통 응답 포맷 (ApiResponse, ApiError)
     ├── exception/              ← 공통 예외 체계 (BusinessException, ErrorCode, GlobalExceptionHandler)
     ├── util/                   ← CanonicalJson (Hash용 canonical 직렬화)

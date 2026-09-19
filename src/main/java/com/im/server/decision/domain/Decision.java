@@ -1,5 +1,6 @@
 package com.im.server.decision.domain;
 
+import com.im.server.decision.api.DecisionType;
 import com.im.server.shared.exception.BusinessException;
 import com.im.server.shared.exception.ErrorCode;
 import jakarta.persistence.Column;

@@ -9,4 +9,7 @@ public interface PostConditionSnapshotRepository
 
   Optional<PostConditionSnapshot> findByContractDocumentIdAndContractDocumentHash(
       String contractDocumentId, String contractDocumentHash);
+
+  Optional<PostConditionSnapshot> findFirstByApplicationIdOrderByCreatedAtDesc(
+      String applicationId);
 }

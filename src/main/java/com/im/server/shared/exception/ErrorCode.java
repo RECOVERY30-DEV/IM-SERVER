@@ -28,10 +28,18 @@ public enum ErrorCode {
   COMPARISON_ITEM_REVIEW_NOT_REQUIRED(
       HttpStatus.BAD_REQUEST, "COMPARISON_400_1", "확인이 필요하지 않은 항목입니다"),
   COMPARISON_RUN_NOT_COMPLETED(HttpStatus.CONFLICT, "COMPARISON_409_1", "아직 비교가 완료되지 않았습니다"),
+  COMPARISON_RETRY_NOT_NEEDED(
+      HttpStatus.CONFLICT, "COMPARISON_409_2", "동일한 조건·정책 Version으로 이미 비교가 존재합니다"),
 
   DECISION_REVIEW_GATE_NOT_CLEARED(
       HttpStatus.BAD_REQUEST, "DECISION_400_1", "필수 확인 항목을 모두 확인해야 진행할 수 있습니다"),
-  DECISION_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "DECISION_409_1", "이미 결정이 저장된 비교입니다");
+  DECISION_SIGNATURE_SESSION_INVALID(
+      HttpStatus.CONFLICT, "DECISION_409_1", "서명 세션이 만료되었거나 존재하지 않습니다"),
+  DECISION_CONTRACT_VERSION_CHANGED(
+      HttpStatus.CONFLICT, "DECISION_409_2", "그 사이 최종 약정서 Version이 변경되어 재비교가 필요합니다"),
+  DECISION_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "DECISION_409_3", "이미 결정이 저장된 비교입니다"),
+
+  PROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "PROOF_404_1", "존재하지 않는 증빙 기록입니다");
 
   private final HttpStatus status;
   private final String code;

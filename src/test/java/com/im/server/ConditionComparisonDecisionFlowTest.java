@@ -158,7 +158,8 @@ class ConditionComparisonDecisionFlowTest {
         .perform(
             post("/api/comparisons/{comparisonId}/decisions", comparisonId)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"decisionType\":\"PROCEED\",\"bypassedUncertainItems\":false}"))
+                .content(
+                    "{\"decisionType\":\"PROCEED\",\"signatureSessionId\":null,\"bypassedUncertainItems\":false}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error.code").value("DECISION_400_1"));
 
@@ -174,24 +175,94 @@ class ConditionComparisonDecisionFlowTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.allReviewed").value(true));
 
-    // S05: 이제 PROCEED 가능
-    mockMvc
-        .perform(
-            post("/api/comparisons/{comparisonId}/decisions", comparisonId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"decisionType\":\"PROCEED\",\"bypassedUncertainItems\":false}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.decisionType").value("PROCEED"))
-        .andExpect(jsonPath("$.data.signedAt").exists());
+    // 확인 없이 서명 세션 없이 결정하면 거부 → 서명 세션 발급
+    String sessionResponse =
+        mockMvc
+            .perform(post("/api/comparisons/{comparisonId}/signature-sessions", comparisonId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.sessionId").exists())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String sessionId = readData(sessionResponse).path("sessionId").asString();
 
-    // 같은 비교에 두 번째 결정은 저장할 수 없다
+    // S05: 이제 PROCEED 가능
+    String decisionResponse =
+        mockMvc
+            .perform(
+                post("/api/comparisons/{comparisonId}/decisions", comparisonId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"decisionType":"PROCEED","signatureSessionId":"%s","bypassedUncertainItems":false}
+                        """
+                            .formatted(sessionId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.decisionType").value("PROCEED"))
+            .andExpect(jsonPath("$.data.signedAt").exists())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    long decisionId = readData(decisionResponse).path("decisionId").asLong();
+
+    // 같은 서명 세션은 재사용할 수 없다
     mockMvc
         .perform(
             post("/api/comparisons/{comparisonId}/decisions", comparisonId)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"decisionType\":\"PROCEED\",\"bypassedUncertainItems\":false}"))
+                .content(
+                    """
+                    {"decisionType":"PROCEED","signatureSessionId":"%s","bypassedUncertainItems":false}
+                    """
+                        .formatted(sessionId)))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.error.code").value("DECISION_409_1"));
+        .andExpect(jsonPath("$.error.code").value("DECISION_409_3"));
+
+    // S06: PROCEED 저장 즉시 Proof가 생성·anchoring(Mock)까지 동기로 끝나 CONFIRMED여야 한다
+    String proofStatusResponse =
+        mockMvc
+            .perform(get("/api/decisions/{decisionId}/proof", decisionId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.anchorStatus").value("CONFIRMED"))
+            .andExpect(jsonPath("$.data.recordSummary.allReviewed").value(true))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    JsonNode proofStatusData = readData(proofStatusResponse);
+    Assertions.assertTrue(
+        proofStatusData.path("recordSummary").path("changedItemsCount").asInt() >= 2);
+    String proofId = proofStatusData.path("proofId").asString();
+
+    // "기록 자세히 보기" — Canonical Payload 필드
+    mockMvc
+        .perform(get("/api/proof/{proofId}", proofId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.anchorStatus").value("CONFIRMED"))
+        .andExpect(jsonPath("$.data.payloadHash").exists())
+        .andExpect(jsonPath("$.data.ledgerReference").exists());
+
+    // 재검증 — Off-chain Payload를 재해싱해서 원장값과 대조하면 일치해야 한다
+    mockMvc
+        .perform(post("/api/proof/{proofId}:verify", proofId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.verified").value(true))
+        .andExpect(jsonPath("$.data.reason").value("VERIFIED"));
+
+    // 이미 동일 정책 Version으로 비교가 존재하므로 재시도는 거부된다
+    mockMvc
+        .perform(post("/api/applications/{applicationId}/comparisons:retry", applicationId))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error.code").value("COMPARISON_409_2"));
+
+    // 상담 핸드오프
+    mockMvc
+        .perform(
+            post("/api/comparisons/{comparisonId}/consultation-referrals", comparisonId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"transferConsentGranted\":true}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.transferConsentGranted").value(true))
+        .andExpect(jsonPath("$.data.referralId").exists());
   }
 
   @Test

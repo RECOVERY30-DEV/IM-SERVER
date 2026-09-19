@@ -47,6 +47,12 @@ public class ComparisonApiImpl implements ComparisonApi {
   @Override
   @Transactional
   public Long startComparison(String applicationId, Long preSnapshotId, Long postSnapshotId) {
+    if (comparisonRunRepository
+        .existsByPreSnapshotIdAndPostSnapshotIdAndRuleVersionAndCalculationVersion(
+            preSnapshotId, postSnapshotId, RULE_VERSION, CALCULATION_VERSION)) {
+      throw new BusinessException(ErrorCode.COMPARISON_RETRY_NOT_NEEDED);
+    }
+
     PreConditionSnapshotView preSnapshot = conditionApi.getPreSnapshot(preSnapshotId);
     PostConditionSnapshotView postSnapshot = conditionApi.getPostSnapshot(postSnapshotId);
 
@@ -105,6 +111,13 @@ public class ComparisonApiImpl implements ComparisonApi {
         .toList();
   }
 
+  @Override
+  public List<ComparisonItemView> listAllItems(Long comparisonRunId) {
+    return comparisonItemRepository.findByComparisonRunId(comparisonRunId).stream()
+        .map(this::toItemView)
+        .toList();
+  }
+
   ComparisonRun findRun(Long comparisonRunId) {
     return comparisonRunRepository
         .findById(comparisonRunId)
@@ -122,7 +135,11 @@ public class ComparisonApiImpl implements ComparisonApi {
         run.getUncertainReason(),
         run.getTotalSteps(),
         run.getCompletedSteps(),
-        run.getProgressPercent());
+        run.getProgressPercent(),
+        run.getPromptVersion(),
+        run.getRuleVersion(),
+        run.getCalculationVersion(),
+        run.getComparisonHash());
   }
 
   ComparisonItemView toItemView(ComparisonItem item) {

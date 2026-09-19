@@ -29,10 +29,39 @@ public class ConditionApiImpl implements ConditionApi {
 
   @Override
   public PreConditionSnapshotView getPreSnapshot(Long preSnapshotId) {
-    PreConditionSnapshot snapshot =
+    return toView(
         preConditionSnapshotRepository
             .findById(preSnapshotId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.CONDITION_PRE_SNAPSHOT_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(ErrorCode.CONDITION_PRE_SNAPSHOT_NOT_FOUND)));
+  }
+
+  @Override
+  public PostConditionSnapshotView getPostSnapshot(Long postSnapshotId) {
+    return toView(
+        postConditionSnapshotRepository
+            .findById(postSnapshotId)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.CONDITION_PRE_SNAPSHOT_NOT_FOUND_FOR_POST)));
+  }
+
+  @Override
+  public PreConditionSnapshotView getLatestPreSnapshot(String applicationId) {
+    return toView(
+        preConditionSnapshotRepository
+            .findFirstByApplicationIdOrderByCreatedAtDesc(applicationId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CONDITION_PRE_SNAPSHOT_NOT_FOUND)));
+  }
+
+  @Override
+  public PostConditionSnapshotView getLatestPostSnapshot(String applicationId) {
+    return toView(
+        postConditionSnapshotRepository
+            .findFirstByApplicationIdOrderByCreatedAtDesc(applicationId)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.CONDITION_PRE_SNAPSHOT_NOT_FOUND_FOR_POST)));
+  }
+
+  private PreConditionSnapshotView toView(PreConditionSnapshot snapshot) {
     return new PreConditionSnapshotView(
         snapshot.getId(),
         snapshot.getApplicationId(),
@@ -43,13 +72,7 @@ public class ConditionApiImpl implements ConditionApi {
         readFields(snapshot.getSnapshotPayload()));
   }
 
-  @Override
-  public PostConditionSnapshotView getPostSnapshot(Long postSnapshotId) {
-    PostConditionSnapshot snapshot =
-        postConditionSnapshotRepository
-            .findById(postSnapshotId)
-            .orElseThrow(
-                () -> new BusinessException(ErrorCode.CONDITION_PRE_SNAPSHOT_NOT_FOUND_FOR_POST));
+  private PostConditionSnapshotView toView(PostConditionSnapshot snapshot) {
     return new PostConditionSnapshotView(
         snapshot.getId(),
         snapshot.getApplicationId(),

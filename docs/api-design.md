@@ -178,9 +178,10 @@ S06 상단 요약 + "검증됨" 배지.
 
 | 필드 | 설명 |
 | --- | --- |
-| `contractNumber`, `loanAmount`, `finalRatePercent`, `decidedAt` | S06 "약정번호 IM-260912-0182" 등 |
+| `proofId` | "기록 자세히 보기"(`GET /api/proof/{proofId}`) 이동용 |
+| `contractNumber`, `loanAmount`, `finalRatePercent`, `decidedAt` | S06 "약정번호" 등 — `contractNumber`는 실제로는 `contractDocumentId`를 그대로 노출한 값(별도 채번 없음) |
 | `anchorStatus` | `PENDING`\|`SUBMITTED`\|`CONFIRMED`\|`FAILED` — 배지는 `CONFIRMED`일 때만 "검증됨" |
-| `recordSummary` | `{ changedItemsCount, allReviewed, evidenceLinked }` — "변경 3건 · 확인 완료 · 원문 연결 완료" |
+| `recordSummary` | `{ changedItemsCount, allReviewed, evidenceLinked }` — `evidenceLinked`는 AI 근거 추출 미구현이라 항상 `false` |
 
 ### `GET /api/proof/{proofId}`
 "기록 자세히 보기" — Canonical Payload 필드·anchor 상세.
@@ -241,10 +242,10 @@ S06 상단 요약 + "검증됨" 배지.
 | `COMPARISON_400_1` | 400 | 확인이 필요 없는 항목에 `:review` 호출 |
 | `COMPARISON_409_1` | 409 | 완료 전 summary 조회 |
 | `COMPARISON_409_2` | 409 | 재비교 사유 없이 `:retry` 호출 |
-| `DECISION_400_1` | 400 | `allReviewed=false`인데 서명 세션 발급 시도 |
-| `DECISION_400_2` | 400 | `allReviewed=false`인데 `PROCEED` 시도 |
-| `DECISION_409_1` | 409 | 서명 세션 만료 |
-| `DECISION_409_2` | 409 | 결정 시점 계약서 Version 불일치 |
+| `DECISION_400_1` | 400 | `allReviewed=false`인데 서명 세션 발급 또는 `PROCEED` 시도 (실제 구현은 두 상황 모두 이 코드 하나로 통일 — 원인이 같은 규칙 위반이라 굳이 나누지 않음) |
+| `DECISION_409_1` | 409 | 서명 세션이 없거나 만료·이미 사용됨 |
+| `DECISION_409_2` | 409 | 서명 세션 발급 이후 최종 약정서 Version이 바뀜 — `POST comparisons:retry` 유도 |
+| `DECISION_409_3` | 409 | 이미 결정이 저장된 비교 (신규 추가 — 설계 당시엔 없었음) |
 | `PROOF_404_1` | 404 | 존재하지 않는 proofId |
 
 ---

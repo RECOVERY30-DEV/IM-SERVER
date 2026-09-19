@@ -10,4 +10,8 @@ public record ComparisonRunView(
     UncertainReason uncertainReason,
     int totalSteps,
     int completedSteps,
-    int progressPercent) {}
+    int progressPercent,
+    String promptVersion,
+    String ruleVersion,
+    String calculationVersion,
+    String comparisonHash) {}
