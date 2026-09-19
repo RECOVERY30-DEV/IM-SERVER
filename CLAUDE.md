@@ -36,17 +36,34 @@
 ## 폴더 구조
 ```
 src/main/java/com/im/server
-├── (도메인 모듈 1)/           ← 첫 모듈이 추가되면 여기부터 시작 (구조는 아래 예시와 동일)
-│   ├── api/                 ← 외부에 노출하는 인터페이스만 (예: MemberApi)
-│   ├── domain/               ← 애그리거트 루트, 값 객체 (예: Member, Email)
-│   ├── createmember/          ← 슬라이스: Command/Handler/Response
-│   ├── getmember/              ← 슬라이스: Query/Handler/View
-│   └── internal/              ← 모듈 내부 전용 (Repository, ApiImpl), 외부 참조 금지
-├── (다른 bounded context 모듈)  (구조 동일)
+├── condition/                  ← V1/V2 Snapshot (FR01~FR03)
+│   ├── api/                    ← ConditionApi, ConditionFields, ConditionFieldCode 등
+│   ├── domain/                  ← PreConditionSnapshot, PostConditionSnapshot
+│   ├── savepreconditionsnapshot/  ← 슬라이스: Command/Handler/Response
+│   ├── getlatestprecondition/
+│   ├── listpreconditions/
+│   ├── savepostconditionsnapshot/
+│   └── internal/                ← Repository, ConditionApiImpl
+├── comparison/                 ← 비교·계산 엔진 (FR04~FR09)
+│   ├── api/                     ← ComparisonApi, ComparisonRunView, ComparisonItemView 등
+│   ├── domain/                   ← ComparisonRun, ComparisonItem, ComparisonImpact
+│   ├── getcomparisonrun/
+│   ├── getcomparisonsummary/
+│   ├── listcomparisonitems/
+│   ├── getcomparisonitem/
+│   └── internal/                 ← ComparisonEngine(Rule), EqualInstallmentCalculator(Calculation), Repository, ComparisonApiImpl
+├── decision/                   ← Review Gate·전자서명 (FR11, FR12) — 아직 api/ 없음(다른 모듈이 필요로 하면 추가)
+│   ├── domain/                   ← DecisionRequiredReview, Decision
+│   ├── getreviewgate/
+│   ├── reviewcomparisonitem/
+│   ├── submitdecision/
+│   └── internal/                 ← Repository, ReviewGateSync
+├── (proof, consultation — docs/db-design.md 스키마만 있고 아직 미구현)
 └── shared/                    ← 공유 커널
-    ├── event/                 ← 모듈 간 비동기 통신
+    ├── event/                 ← 모듈 간 비동기 통신 (아직 미사용 — 현재는 comparison→condition 같은 동기 호출만 있음)
     ├── response/               ← 공통 응답 포맷 (ApiResponse, ApiError)
     ├── exception/              ← 공통 예외 체계 (BusinessException, ErrorCode, GlobalExceptionHandler)
+    ├── util/                   ← CanonicalJson (Hash용 canonical 직렬화)
     └── web/                    ← 전역 web 설정 (CorsConfig, OpenApiConfig, RootController)
 ```
 
@@ -62,6 +79,12 @@ src/main/java/com/im/server
 ### DTO / 도메인 객체
 - `Command`/`Query`/`Response`/`View`는 Java record로 작성 (Lombok 사용 안 함)
 - 엔티티·값 객체(`domain/` 패키지)는 `@Getter @Setter @NoArgsConstructor` + 별도 생성자에서 유효성 검증, 실패 시 `BusinessException` throw
+
+### Jackson 3 주의 (Spring Boot 4)
+- 이 프로젝트의 `ObjectMapper`/`JsonNode`/`MapperFeature` 등은 **`tools.jackson.databind.*`** (Jackson 3)다 — `com.fasterxml.jackson.databind.*`(Jackson 2, "Classic")를 import하면 컴파일은 되지만 Spring이 자동구성한 Bean과 타입이 달라 `NoSuchBeanDefinitionException`으로 기동이 실패한다
+- `com.fasterxml.jackson.annotation.*`(`@JsonProperty` 등 어노테이션)는 여전히 Jackson 2 패키지를 그대로 쓴다 — 어노테이션과 런타임 타입(ObjectMapper 등)의 groupId가 다르다는 점을 헷갈리지 말 것
+- 커스텀 `ObjectMapper`가 필요하면 생성자로 설정을 바꿀 수 없다(불변) — `JsonMapper.builder().enable(...).disable(...).build()`로 만들 것 (참고: `shared/util/CanonicalJson`)
+- `writeValueAsString`/`readValue`가 던지는 `JacksonException`은 Jackson 2와 달리 **unchecked**다
 
 ### 응답 포맷
 - 모든 컨트롤러(Handler)는 `ResponseEntity<ApiResponse<T>>`를 반환한다
