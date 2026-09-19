@@ -1,4 +1,4 @@
-package com.im.server.decision.domain;
+package com.im.server.decision.api;
 
 public enum DecisionType {
   PROCEED,

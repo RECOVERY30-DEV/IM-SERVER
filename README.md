@@ -4,7 +4,7 @@
 
 제품 배경/문제정의/요구사항은 [`docs/prd.md`](./docs/prd.md) (PRD v1.0, 2026-09-12 기준)가 정본이다. 화면 매핑은 [`docs/wireframes.md`](./docs/wireframes.md), DB 스키마는 [`docs/db-design.md`](./docs/db-design.md), 리소스별 API 스펙은 [`docs/api-design.md`](./docs/api-design.md)가 정본이다.
 
-2026-09-17 기준 `condition`(V1/V2 Snapshot)·`comparison`(비교/계산 엔진)·`decision`(Review Gate·전자서명) 세 모듈이 구현되어 신청→최종심사→자동비교→필수확인→약정결정까지 핵심 흐름이 동작한다. `proof`(블록체인 무결성 증빙)·`consultation`(상담 핸드오프)은 아직 스키마만 있고 미구현이다 — 새 기능을 추가하기 전에 `CLAUDE.md`와 `docs/prd.md`를 먼저 읽을 것.
+2026-09-19 기준 `condition`(V1/V2 Snapshot)·`comparison`(비교/계산 엔진)·`decision`(Review Gate·전자서명·서명세션)·`proof`(무결성 증빙, Mock Blockchain Adapter)·`consultation`(상담 핸드오프) 다섯 모듈이 모두 구현되어 신청→최종심사→자동비교→필수확인→서명→약정완료→증빙검증까지 전체 흐름이 동작한다. AI 문서추출(비정형 근거·사유)만 별도 AI 연동이 필요해 빠져 있다 — 새 기능을 추가하기 전에 `CLAUDE.md`와 `docs/prd.md`를 먼저 읽을 것.
 
 ## 기술 스택
 - Java 25 / Spring Boot 4.1.1
@@ -65,9 +65,13 @@ docker compose up -d
 - [x] S01~S06·E01 전체 화면 기반 DB 설계 (`docs/db-design.md`) + 첫 Flyway 마이그레이션(`V1~V4`, 아직 엔티티는 없음)
 - [x] 리소스별 API 설계 (`docs/api-design.md` — condition/comparison/decision/proof/consultation 리소스, 신규 ErrorCode 제안 포함)
 - [x] `condition`/`comparison`/`decision` 모듈 구현 — V1·V2 Snapshot, 구조화 입력 비교 Rule Engine(STRUCTURED_API 경로만, AI 문서추출은 미구현), 원리금균등 계산, Review Gate, 전자서명 Decision까지 end-to-end 테스트로 검증
-- [ ] `proof` 모듈 구현 (Blockchain Adapter Contract, `implementation-spec.md` 13장) — 스키마(`V5`)만 있고 코드 없음
-- [ ] `comparison_run_steps`/`comparison_item_evidence`(AI Reason·Evidence) 구현 — 지금은 비교가 동기로 즉시 끝나 진행상태 UI(S02)가 항상 100%로만 보이고, S04의 "확인된 변경 사유"·원문 근거 링크는 응답에 없음
-- [ ] 실제 MySQL에 마이그레이션 적용 검증 (이 세션은 로컬 Docker 미가용이라 SQL 문법만 검토했고 실행 검증은 못함, H2 기반 테스트로 로직만 검증)
+- [x] 서명 세션(`signature-sessions`), 비교 재시도(`:retry`) 엔드포인트 구현
+- [x] `proof` 모듈 구현 — `implementation-spec.md` 13장 Blockchain Adapter Contract대로 `BlockchainAdapter` 인터페이스 + `MockBlockchainAdapter`(DB 기반 목 원장) 구현. Decision(PROCEED) 저장 시 `DecisionSubmittedEvent`로 자동 anchoring, `GET /api/proof/{proofId}`·`:verify`까지 동작 확인
+- [x] `consultation` 모듈 구현 — 상담 핸드오프 기록(실제 상담 연동은 Non-goal)
+- [ ] `comparison_run_steps`/`comparison_item_evidence`(AI Reason·Evidence) — **실제 AI/문서추출 서비스 연동이 필요한 범위**라 이번엔 안 함. 지금은 비교가 동기로 즉시 끝나 진행상태 UI(S02)가 항상 100%로만 보이고, S04의 "확인된 변경 사유"·원문 근거 링크는 응답에 없음
+- [x] 실제 운영 RDS(`im` 스키마)에 매 배포마다 직접 붙여서 Hibernate `ddl-auto=validate` 통과 확인 — H2 테스트는 마이그레이션을 안 타므로 이 확인을 대체하지 못함(V6에서 실제로 타입 불일치를 잡은 적 있음)
 - [x] 배포 파이프라인 (`deploy/`, `.github/workflows/deploy.yml`) — recovery-server와 같은 EC2, 8090 포트에 단일 컨테이너로 배포
 - [x] GitHub Actions secrets 등록 + EC2 보안그룹 8090 포트 오픈 (2026-09-19 완료)
 - [ ] 운영 도메인이 생기면 CORS 허용 origin 갱신 + nginx 가상호스팅으로 전환
+- [ ] 인증/인가(고객·상담원·운영자·AI Worker·Ledger Writer 역할 분리, `implementation-spec.md` 14장) — 아직 없음. `proof` 검증 API의 `requestedBy`가 항상 `SYSTEM`으로 기록되는 것도 이 때문
+- [ ] 실제 블록체인 네트워크 선정 시 `proof.internal.MockBlockchainAdapter`를 `proof.api.BlockchainAdapter` 새 구현체로 교체

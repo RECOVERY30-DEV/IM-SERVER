@@ -13,4 +13,6 @@ public interface ComparisonApi {
   ComparisonItemView getItem(Long itemId);
 
   List<ComparisonItemView> listRequiredReviewItems(Long comparisonRunId);
+
+  List<ComparisonItemView> listAllItems(Long comparisonRunId);
 }

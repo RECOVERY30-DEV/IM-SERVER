@@ -59,7 +59,7 @@ public class ArchitectureTest {
           .resideInAPackage("..comparison.domain..")
           .because("comparison.domain은 comparison 모듈 밖에서 직접 참조할 수 없습니다 (comparison.api를 통해서만 접근)");
 
-  // ── decision 모듈 ── (아직 api 패키지가 없음 — 다른 모듈이 필요로 할 때 추가)
+  // ── decision 모듈 ──
   @ArchTest
   static final ArchRule decision_internal_is_not_accessed_from_outside =
       noClasses()
@@ -78,5 +78,47 @@ public class ArchitectureTest {
           .should()
           .dependOnClassesThat()
           .resideInAPackage("..decision.domain..")
-          .because("decision.domain은 decision 모듈 밖에서 직접 참조할 수 없습니다");
+          .because("decision.domain은 decision 모듈 밖에서 직접 참조할 수 없습니다 (decision.api를 통해서만 접근)");
+
+  // ── proof 모듈 ──
+  @ArchTest
+  static final ArchRule proof_internal_is_not_accessed_from_outside =
+      noClasses()
+          .that()
+          .resideOutsideOfPackage("..proof..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage("..proof.internal..")
+          .because("proof.internal은 proof 모듈 내부에서만 사용해야 합니다");
+
+  @ArchTest
+  static final ArchRule proof_domain_is_not_accessed_from_outside =
+      noClasses()
+          .that()
+          .resideOutsideOfPackage("..proof..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage("..proof.domain..")
+          .because("proof.domain은 proof 모듈 밖에서 직접 참조할 수 없습니다 (proof.api를 통해서만 접근)");
+
+  // ── consultation 모듈 ── (아직 api 패키지가 없음 — 다른 모듈이 필요로 할 때 추가)
+  @ArchTest
+  static final ArchRule consultation_internal_is_not_accessed_from_outside =
+      noClasses()
+          .that()
+          .resideOutsideOfPackage("..consultation..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage("..consultation.internal..")
+          .because("consultation.internal은 consultation 모듈 내부에서만 사용해야 합니다");
+
+  @ArchTest
+  static final ArchRule consultation_domain_is_not_accessed_from_outside =
+      noClasses()
+          .that()
+          .resideOutsideOfPackage("..consultation..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage("..consultation.domain..")
+          .because("consultation.domain은 consultation 모듈 밖에서 직접 참조할 수 없습니다");
 }
