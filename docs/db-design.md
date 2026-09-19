@@ -47,8 +47,9 @@
 | `V3__create_decision_and_proof_tables.sql` | `decision_required_reviews`, `decisions`, `proof_records`, `proof_verifications` |
 | `V4__create_audit_and_consultation_tables.sql` | `audit_condition_events`, `consultation_referrals` |
 | `V5__align_proof_tables_with_blockchain_adapter_contract.sql` | `comparison_runs`의 `policy_version` → `prompt_version`/`rule_version`/`calculation_version` 분리, `proof_records`/`proof_verifications`를 13장(Blockchain Adapter Contract) 기준으로 재작성 |
+| `V6__fix_comparison_runs_progress_percent_type.sql` | `comparison_runs.progress_percent`를 `SMALLINT` → `INT`로 수정 — `ComparisonRun.progressPercent`(`int`)와 타입이 안 맞아 운영 배포 중 `ddl-auto=validate`가 기동을 막았음(H2 기반 로컬 테스트는 엔티티에서 스키마를 새로 만들어 이 불일치를 못 잡았다) |
 
-실제 SQL은 `src/main/resources/db/migration/`에 위 파일명 그대로 있다 (엔티티는 아직 없음 — Hibernate `validate` 모드는 매핑 안 된 테이블 존재 자체는 검증하지 않으므로 먼저 스키마만 있어도 기동에 문제없다). 도메인 모듈을 실제로 만들 때 엔티티를 이 스키마에 맞춰 작성할 것.
+실제 SQL은 `src/main/resources/db/migration/`에 위 파일명 그대로 있다. `condition`/`comparison`/`decision` 모듈은 엔티티가 이 스키마에 매핑돼 있으므로(`proof`/`consultation`/`audit`은 아직 미매핑), 새 컬럼을 추가할 때 엔티티 타입과 SQL 컬럼 타입이 정확히 맞는지 반드시 실제 MySQL로 확인할 것 — H2 기반 테스트(`ddl-auto=create-drop`)는 마이그레이션을 아예 안 타서 이런 불일치를 잡지 못한다.
 
 ---
 
