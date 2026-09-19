@@ -4,7 +4,7 @@
 
 제품 배경/문제정의/요구사항은 [`docs/prd.md`](./docs/prd.md) (PRD v1.0, 2026-09-12 기준)가 정본이다. 화면 매핑은 [`docs/wireframes.md`](./docs/wireframes.md), DB 스키마는 [`docs/db-design.md`](./docs/db-design.md), 리소스별 API 스펙은 [`docs/api-design.md`](./docs/api-design.md)가 정본이다.
 
-이 저장소는 2026-09-16 기준 **뼈대만 갖춘 초기 세팅 상태**다. 아직 실제 도메인 모듈(조건 스냅샷, 비교/계산 엔진, 무결성 증빙 등)은 하나도 들어있지 않고, 공통 인프라(응답 포맷/예외 처리/DB/CI/로컬 개발 환경)만 구성되어 있다. 새 기능을 추가하기 전에 `CLAUDE.md`와 `docs/prd.md`를 먼저 읽을 것.
+2026-09-17 기준 `condition`(V1/V2 Snapshot)·`comparison`(비교/계산 엔진)·`decision`(Review Gate·전자서명) 세 모듈이 구현되어 신청→최종심사→자동비교→필수확인→약정결정까지 핵심 흐름이 동작한다. `proof`(블록체인 무결성 증빙)·`consultation`(상담 핸드오프)은 아직 스키마만 있고 미구현이다 — 새 기능을 추가하기 전에 `CLAUDE.md`와 `docs/prd.md`를 먼저 읽을 것.
 
 ## 기술 스택
 - Java 25 / Spring Boot 4.1.1
@@ -58,7 +58,9 @@ docker compose up -d
 - [x] S01·S02 와이어프레임 → API 설계 참고 정리 (`docs/wireframes.md`)
 - [x] S01~S06·E01 전체 화면 기반 DB 설계 (`docs/db-design.md`) + 첫 Flyway 마이그레이션(`V1~V4`, 아직 엔티티는 없음)
 - [x] 리소스별 API 설계 (`docs/api-design.md` — condition/comparison/decision/proof/consultation 리소스, 신규 ErrorCode 제안 포함)
-- [ ] 첫 도메인 모듈 구현 (`condition`/`comparison`/`decision`/`proof` — `docs/db-design.md` 6.5 우선순위 순으로 착수, `docs/api-design.md`가 Command/Query/Handler/Response 스펙)
-- [ ] 실제 MySQL에 마이그레이션 적용 검증 (이 세션은 로컬 Docker 미가용이라 SQL 문법만 검토했고 실행 검증은 못함)
+- [x] `condition`/`comparison`/`decision` 모듈 구현 — V1·V2 Snapshot, 구조화 입력 비교 Rule Engine(STRUCTURED_API 경로만, AI 문서추출은 미구현), 원리금균등 계산, Review Gate, 전자서명 Decision까지 end-to-end 테스트로 검증
+- [ ] `proof` 모듈 구현 (Blockchain Adapter Contract, `implementation-spec.md` 13장) — 스키마(`V5`)만 있고 코드 없음
+- [ ] `comparison_run_steps`/`comparison_item_evidence`(AI Reason·Evidence) 구현 — 지금은 비교가 동기로 즉시 끝나 진행상태 UI(S02)가 항상 100%로만 보이고, S04의 "확인된 변경 사유"·원문 근거 링크는 응답에 없음
+- [ ] 실제 MySQL에 마이그레이션 적용 검증 (이 세션은 로컬 Docker 미가용이라 SQL 문법만 검토했고 실행 검증은 못함, H2 기반 테스트로 로직만 검증)
 - [ ] 배포 파이프라인 (EC2/Docker Hub 등 운영 인프라가 정해지면 recovery-server의 `deploy.yml`/`deploy/` 구성 참고해서 추가)
 - [ ] 운영 도메인 확정 후 CORS 허용 origin 갱신
