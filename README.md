@@ -74,6 +74,6 @@ docker compose up -d
 - [x] 배포 파이프라인 (`deploy/`, `.github/workflows/deploy.yml`) — recovery-server와 같은 EC2, 8090 포트에 단일 컨테이너로 배포
 - [x] GitHub Actions secrets 등록 + EC2 보안그룹 8090 포트 오픈 (2026-09-19 완료)
 - [x] 운영 도메인 연결 (`https://im.recovery-30.shop`, nginx 가상호스팅 + 별도 인증서, 2026-09-20 완료)
-- [ ] 프론트엔드 주소가 정해지면 `CORS_ALLOWED_ORIGINS`에 추가 (현재는 로컬 개발 주소만 허용)
+- [x] 프론트엔드 주소 확정 후 `CORS_ALLOWED_ORIGINS`에 추가 (`https://im-client-gyeongbinmins-projects.vercel.app`, 2026-09-20 완료 — `.github/workflows/deploy.yml` env로 관리)
 - [ ] 인증/인가(고객·상담원·운영자·AI Worker·Ledger Writer 역할 분리, `implementation-spec.md` 14장) — 아직 없음. `proof` 검증 API의 `requestedBy`가 항상 `SYSTEM`으로 기록되는 것도 이 때문
 - [ ] 실제 블록체인 네트워크 선정 시 `proof.internal.MockBlockchainAdapter`를 `proof.api.BlockchainAdapter` 새 구현체로 교체
