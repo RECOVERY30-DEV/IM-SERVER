@@ -51,7 +51,7 @@ public class ComparisonImpact {
   @Column(name = "total_cost_delta", nullable = false)
   private BigDecimal totalCostDelta;
 
-  @Column(name = "calculation_basis", nullable = false, length = 20)
+  @Column(name = "calculation_basis", nullable = false, length = 50)
   private String calculationBasis;
 
   @Column(name = "rounding_rule", nullable = false, length = 20)
