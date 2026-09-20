@@ -9,6 +9,8 @@ permissions:
 
 env:
   IMAGE: haul123/im-server
+  # 프론트엔드 배포 주소가 바뀌면 여기만 고치면 된다 (민감정보가 아니라 secrets로 안 뺌)
+  CORS_ALLOWED_ORIGINS: https://im-client-gyeongbinmins-projects.vercel.app
 
 jobs:
   build-and-deploy:
@@ -51,6 +53,7 @@ jobs:
             DB_NAME=${{ secrets.IM_DB_NAME }}
             DB_USERNAME=${{ secrets.IM_DB_USERNAME }}
             DB_PASSWORD=${{ secrets.IM_DB_PASSWORD }}
+            CORS_ALLOWED_ORIGINS=${{ env.CORS_ALLOWED_ORIGINS }}
             EOF
             chmod +x deploy.sh
             ./deploy.sh
